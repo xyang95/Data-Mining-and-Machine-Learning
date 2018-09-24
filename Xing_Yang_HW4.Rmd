@@ -1,0 +1,150 @@
+---
+title: "Fall 2017 DA5030 Homework 4"
+author: "Xing Yang"
+date: "2017/10/10"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###Problem 1
+
+```{r}
+library(tm)
+#exploring and preparing the data
+
+sms_raw <- read.csv("/Users/xingyang/Desktop/5030/spammsg.csv")
+str(sms_raw)
+#convert "type" into a factor
+sms_raw$type <- factor(sms_raw$type)
+str(sms_raw$type)
+table(sms_raw$type)
+
+#cleaning and standardizing text data
+sms_corpus <- VCorpus(VectorSource(sms_raw$text))
+print(sms_corpus)
+# a summary of the first and second SMS messages in the corpus
+inspect(sms_corpus[1:2])
+as.character(sms_corpus[[1]])
+lapply(sms_corpus[1:2], as.character)
+#convert to lowercase
+sms_corpus_clean <- tm_map(sms_corpus,
+    content_transformer(tolower))
+#check 
+as.character(sms_corpus[[1]])
+as.character(sms_corpus_clean[[1]])
+#remove numbers
+sms_corpus_clean <- tm_map(sms_corpus_clean, removeNumbers)
+#remove stop words
+sms_corpus_clean <- tm_map(sms_corpus_clean, removeWords, stopwords())
+#eliminate punctuation
+sms_corpus_clean <- tm_map(sms_corpus_clean, removePunctuation)
+#transformation strips punctuation characters
+removePunctuation("hello...world")
+library(SnowballC)
+wordStem(c("learn", "learned", "learning", "learns"))
+sms_corpus_clean <- tm_map(sms_corpus_clean, stemDocument)
+#remove additional whitespace
+sms_corpus_clean <- tm_map(sms_corpus_clean, stripWhitespace)
+
+#splitting text documents into words
+sms_dtm <- DocumentTermMatrix(sms_corpus_clean)
+sms_dtm2 <- DocumentTermMatrix(sms_corpus, control = list(
+    tolower = TRUE,
+    removeNumbers = TRUE,
+    stopwords = TRUE,
+    removePunctuation = TRUE,
+    stemming = TRUE
+))
+sms_dtm
+sms_dtm2
+
+#creating training and test datasets
+sms_dtm_train <- sms_dtm[1:4169, ]
+sms_dtm_test  <- sms_dtm[4170:5559, ]
+sms_train_labels <- sms_raw[1:4169, ]$type
+sms_test_labels  <- sms_raw[4170:5559, ]$type
+prop.table(table(sms_train_labels))
+prop.table(table(sms_test_labels))
+
+#visualizing text data
+library(wordcloud)
+wordcloud(sms_corpus_clean, min.freq = 50, random.order = FALSE)
+spam <- subset(sms_raw, type == "spam")
+ham <- subset(sms_raw, type == "ham")
+wordcloud(spam$text, max.words = 40, scale = c(3, 0.5))
+wordcloud(ham$text, max.words = 40, scale = c(3, 0.5))
+
+#creating indicator features for frequent words
+sms_freq_words <- findFreqTerms(sms_dtm_train, 5)
+str(sms_freq_words)
+sms_dtm_freq_train<- sms_dtm_train[ ,sms_freq_words]
+sms_dtm_freq_test <- sms_dtm_test[ , sms_freq_words]
+convert_counts <- function(x) {
+    x <- ifelse(x > 0, "Yes", "No")
+}
+sms_train <- apply(sms_dtm_freq_train, MARGIN = 2, convert_counts)
+sms_test <- apply(sms_dtm_freq_test, MARGIN = 2, convert_counts)
+
+```
+
+###Problem 2
+
+```{r}
+library(klaR)
+library(MASS)
+data(iris)
+
+#nrow(iris)
+#summary(iris)
+head(iris)
+
+# identify indexes to be in testing dataset
+# every index of 5th, 10th, 15th .. will be the testing dataset
+# the rest are training dataset
+testidx <- which(1:length(iris[, 1]) %% 5 == 0)
+
+# separate into training and testing datasets
+iristrain <- iris[-testidx,]
+iristest <- iris[testidx,]
+
+# apply Naive Bayes
+nbmodel <- NaiveBayes(Species~., data=iristrain)
+
+# check the accuracy
+prediction <- predict(nbmodel, iristest[,-5])
+table(prediction$class, iristest[,5])
+```
+
+####Quesiton 1
+
+Since we already have the "nbmodel" model, once I have a new case, I would use the"predict" function( predict(object, newdata, threshold = 0.001, ...) Object is nbmodel, Newdata is the new case, threshold replacing cells with zero probabilities ) to make a prediciton.
+
+####Question 2
+
+This packege can automatically deal wiht numeric features. We can sew the nbmodel in R( "$tables$Sepal.Length", "$tables$Sepal.Width", "$tables$Petal.Length", $tables$Petal.Width), this package calucate four features intervals for three species. For example, $tables$Sepal.Length, it shows the range of Speal.Length of each species, once you have a Sepal.Length, this package would allot is to one internal. Although these intervals have overlaps, but it is does not matter, we have four features means each spieces have four intervals to match, then trasfer numeric features to nominal. This method is how to deal with numeric features in this package.
+
+####Question 3
+
+For my part, since Iris do not have this case, I guess Laplace estimator maybe not use in this example. In this package, function "laplace" would be used for Laplace smoothing and defaults to zero.
+
+###Problem 3
+
+Laplace is a mothod or assumpation to make sure every events occurred, since we know that an experiment for which both success and failure are possible, we make an assumaption that success and failure have been observed at least once.
+
+For events that have not been observed to occur at all in sample data but is does not mean it has no chance of occruance,  we can use laplace estimotor to ensures that each feature has a nonzero probability of occurring with each class. . We presume that each feature occurs some number of times.
+
+Laplace estimator is very usefule in the problem of text categorization, when a word does not appear in the training sample, so the probability of using this word is zero, and the probability of calculating the text is multiplied by 0. It is unreasonable that the probability of an event can not be considered arbitrarily because an event is not observed. 
+
+For example, assuming that there are three classes in the text classification which are C1, C2 and C3. In a given training sample, a word K1, in each class, the count observed were 0, 990, 10 which means the probability of work K1 occurred in each class are 0, 0.99 and 0.01. If we directly calcuate the prior probabilty that would be equal to zero, so we can use Laplace estimator to let these probability be respectively equal to 1 / 1003 = 0.001???991 / 1003=0.988???11 / 1003=0.011. We ensure that word K1 is found in each class an lease once. Then we can use the Naive Bayes Classifier. 
+
+
+
+
+
+

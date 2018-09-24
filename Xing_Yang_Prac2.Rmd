@@ -1,0 +1,515 @@
+---
+title: "Fall 2017 DA5030 Practicum 2"
+author: "Xing Yang"
+date: "2017/10/29"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Problem 1
+
+### 1&2
+
+```{r}
+adult <-  read.table(file="/Users/xingyang/Desktop/5030/prac2.txt", sep = ",")
+colnames(adult) <- c("age", "workclass", "fnlwgt", "education", "education-num", "marital-status", "occupation", "relationship", "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country", "class")
+str(adult)
+```
+
+### 3
+
+```{r}
+library(dplyr)
+library(matrixStats)
+freq <- adult %>%
+  group_by(sex) %>%
+  summarise(
+    Federalgov = matrixStats::count(workclass == " Federal-gov"),
+    NoFederalgov = matrixStats::count(workclass != " Federal-gov"),
+    Bachelors = matrixStats::count(education == " Bachelors"),
+    NoBachelors = matrixStats::count(education != " Bachelors"),
+    Nevermarried = matrixStats::count(`marital-status` == " Never-married"),
+    NoNevermarried = matrixStats::count(`marital-status` != " Never-married"),
+    AmerIndianEskimo = matrixStats::count(race == " Amer-Indian-Eskimo"),
+    NoAmerIndianEskimo = matrixStats::count(race != " Amer-Indian-Eskimo"),
+    Mexico = matrixStats::count(`native-country` == " Mexico"),
+    NoMexico = matrixStats::count(`native-country` != " Mexico"),
+    Less50K = matrixStats::count(class == " <=50K"),
+    More50K = matrixStats::count(class == " >50K")
+  )
+
+like <- adult %>%
+  group_by(sex) %>%
+  summarise(
+    Federalgov = matrixStats::count(workclass == " Federal-gov")/n(),
+    NoFederalgov = matrixStats::count(workclass != " Federal-gov")/n(),
+    Bachelors = matrixStats::count(education == " Bachelors")/n(),
+    NoBachelors = matrixStats::count(education != " Bachelors")/n(),
+    Nevermarried = matrixStats::count(`marital-status` == " Never-married")/n(),
+    NoNevermarried = matrixStats::count(`marital-status` != " Never-married")/n(),
+    AmerIndianEskimo = matrixStats::count(race == " Amer-Indian-Eskimo")/n(),
+    NoAmerIndianEskimo = matrixStats::count(race != " Amer-Indian-Eskimo")/n(),
+    Mexico = matrixStats::count(`native-country` == " Mexico")/n(),
+    NoMexico = matrixStats::count(`native-country` != " Mexico")/n(),
+    Less50K = matrixStats::count(class == " <=50K")/n(),
+    More50K = matrixStats::count(class == " >50K")/n(),
+    Gender = n() / nrow(adult)
+  )
+freq
+like
+a <- prod(like[2, c(2,4,6,8,10,12,14)])
+b <- prod(like[1, c(2,4,6,8,10,12,14)])
+a / (a + b)
+b / (a + b)
+```
+
+A AmerIndianEskimo person who is federal government worker with a bachelors degree who immigrated from Mexico and never married and class <= 50K, the probability of that the person is man is 0.5998481, the probability of a woman is 0.4001519.
+
+The probibality of a person who is a male for male adult who is a federal government worker with a bachelors degree who immigrated from Ireland is 0.3626963, the probabilty of class >50K is 0.6373037. 
+
+### 4
+
+```{r}
+frequency <- adult %>%
+  group_by(class) %>%
+  summarise(
+    Federalgov = matrixStats::count(workclass == " Federal-gov"),
+    NoFederalgov = matrixStats::count(workclass != " Federal-gov"),
+    Bachelors = matrixStats::count(education == " Bachelors"),
+    NoBachelors = matrixStats::count(education != " Bachelors"),
+    Male = matrixStats::count(sex == " Male"),
+    Female = matrixStats::count(sex != " Male"),
+    Ireland = matrixStats::count(`native-country` == " Ireland"),
+    NoIreland = matrixStats::count(`native-country` != " Ireland"),
+    Less50K = matrixStats::count(class == " <=50K"),
+    More50K = matrixStats::count(class == " >50K")
+ )
+
+likelihood <- adult %>%
+  group_by(class) %>%
+  summarise(
+    Federalgov = matrixStats::count(workclass == " Federal-gov")/n(),
+    NoFederalgov = matrixStats::count(workclass != " Federal-gov")/n(),
+    Bachelors = matrixStats::count(education == " Bachelors")/n(),
+    NoBachelors = matrixStats::count(education != " Bachelors")/n(),
+    White = matrixStats::count(race == " White")/n(),
+    NoWhite = matrixStats::count(race != " White")/n(),
+    Male = matrixStats::count(sex == " Male")/n(),
+    Female = matrixStats::count(sex != " Male")/n(),
+    Ireland = matrixStats::count(`native-country` == " Ireland")/n(),
+    NoIreland = matrixStats::count(`native-country` != " Ireland")/n(),
+    Class = n()/nrow(adult)
+)
+likelihood
+```
+
+```{r}
+c = prod(likelihood[1,c(2,4,6,8,10,12)])
+d = prod(likelihood[2,c(2,4,6,8,10,12)])
+c / (c + d)
+d / (c + d)
+```
+
+The probibality of class <=50K for a white male adult who is a federal government worker with a bachelors degree who immigrated from Ireland is 0.3626963, the probabilty of class >50K is 0.6373037. 
+
+### 5
+
+```{r}
+library(dummies)
+adult1 <- dummy.data.frame(adult, names = c("workclass", "education","sex","race", "native-country", "class"))
+
+library(tidyverse)
+dummy <- select(adult1, `workclass Federal-gov`, `education Bachelors`, `race White`, `sex Male`, `native-country Ireland`, `class >50K`)
+colnames(dummy) <- c("F", "B", "W", "M", "I", "C50")
+#C50, larger 50k would be one
+
+#change to training data to likellihood table
+likelihoodtable <- function(x){
+  table <- x %>%
+    group_by(C50) %>%
+    summarise(
+      F1 = (sum(F == 1) + 1)/(n() + 5),
+      F0 = (sum(F == 0) + 1)/(n() + 5),
+      B1 = (sum(B == 1) + 1)/(n() + 5),
+      B0 = (sum(B == 0) + 1)/(n() + 5),
+      W1 = (sum(W == 1) + 1)/(n() + 5),
+      W0 = (sum(W == 0) + 1)/(n() + 5),
+      M1 = (sum(M == 1) + 1)/(n() + 5),
+      M0 = (sum(M == 0) + 1)/(n() + 5),
+      I1 = (sum(I == 1) + 1)/(n() + 5),
+      I0 = (sum(I == 0) + 1)/(n() + 5),
+      C1 = (n() + 5)/(nrow(x) + 10)
+    )
+  return(table)
+}
+
+#NaiveBayes classification
+MyNaiveBayes <- function(train, test){
+  prob <- numeric(nrow(test))
+  f <- likelihoodtable(train)
+  for(j in 1:nrow(test)){
+    if(test$F[j] == 1){
+      if(test$B[j] == 1){
+        if(test$W[j] == 1){
+          if(test$M[j] == 1){
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(2,4,6,8,10,12)]) / (prod(f[2, c(2,4,6,8,10,12)]) + prod(f[1, c(2,4,6,8,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(2,4,6,8,11,12)]) / (prod(f[2, c(2,4,6,8,11,12)]) + prod(f[1, c(2,4,6,8,11,12)]))
+            }
+          }else{
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(2,4,6,9,10,12)]) / (prod(f[2, c(2,4,6,9,10,12)]) + prod(f[1, c(2,4,6,9,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(2,4,6,9,11,12)]) / (prod(f[2, c(2,4,6,8,11,12)]) + prod(f[1, c(2,4,6,9,11,12)]))
+             }
+          }
+        }else{
+          if(test$M[j] == 1){
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(2,4,7,8,10,12)]) / (prod(f[2, c(2,4,7,8,10,12)]) + prod(f[1, c(2,4,7,8,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(2,4,7,8,11,12)]) / (prod(f[2, c(2,4,7,8,11,12)]) + prod(f[1, c(2,4,7,8,11,12)]))
+            }
+          }else{
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(2,4,7,9,10,12)]) / (prod(f[2, c(2,4,7,9,10,12)]) + prod(f[1, c(2,4,7,9,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(2,4,7,9,11,12)]) / (prod(f[2, c(2,4,7,9,11,12)]) + prod(f[1, c(2,4,7,9,11,12)]))
+            }
+          }
+        }
+      }else{
+        if(test$W[j] == 1){
+          if(test$M[j] == 1){
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(2,5,6,8,10,12)]) / (prod(f[2, c(2,5,6,8,10,12)]) + prod(f[1, c(2,5,6,8,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(2,5,6,8,11,12)]) / (prod(f[2, c(2,5,6,8,11,12)]) + prod(f[1, c(2,5,6,8,11,12)]))
+            }
+          }else{
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(2,5,6,9,10,12)]) / (prod(f[2, c(2,5,6,9,10,12)]) + prod(f[1, c(2,5,6,9,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(2,5,6,9,11,12)]) / (prod(f[2, c(2,5,6,9,11,12)]) + prod(f[1, c(2,5,6,9,11,12)]))
+            }
+          }
+        }else{
+          if(test$M[j] == 1){
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(2,5,7,8,10,12)]) / (prod(f[2, c(2,5,7,8,10,12)]) + prod(f[1, c(2,5,7,8,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(2,5,7,8,11,12)]) / (prod(f[2, c(2,5,7,8,11,12)]) + prod(f[1, c(2,5,6,8,11,12)]))
+            }
+          }else{
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(2,5,7,9,10,12)]) / (prod(f[2, c(2,5,7,9,10,12)]) + prod(f[1, c(2,5,7,9,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(2,5,7,9,11,12)]) / (prod(f[2, c(2,5,7,9,11,12)]) + prod(f[1, c(2,5,7,9,11,12)]))
+            }
+          }
+        }
+      }
+    }else{
+      if(test$B[j] == 1){
+        if(test$W[j] == 1){
+          if(test$M[j] == 1){
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(3,4,6,8,10,12)]) / (prod(f[2, c(3,4,6,8,10,12)]) + prod(f[1, c(3,4,6,8,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(3,4,6,8,11,12)]) / (prod(f[2, c(3,4,6,8,11,12)]) + prod(f[1, c(3,4,6,8,11,12)]))
+            }
+          }else{
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(3,4,6,9,10,12)]) / (prod(f[2, c(3,4,6,9,10,12)]) + prod(f[1, c(3,4,6,9,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(3,4,6,9,11,12)]) / (prod(f[2, c(3,4,6,9,11,12)]) + prod(f[1, c(3,4,6,9,11,12)]))
+            }
+          }
+        }else{
+          if(test$M[j] == 1){
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(3,4,7,8,10,12)]) / (prod(f[2, c(3,4,7,8,10,12)]) + prod(f[1, c(3,4,7,8,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(3,4,7,8,11,12)]) / (prod(f[2, c(3,4,7,8,11,12)]) + prod(f[1, c(3,4,7,8,11,12)]))
+            }
+          }else{
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(3,4,7,9,10,12)]) / (prod(f[2, c(3,4,7,9,10,12)]) + prod(f[1, c(3,4,7,9,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(3,4,7,9,11,12)]) / (prod(f[2, c(3,4,7,9,11,12)]) + prod(f[1, c(3,4,7,9,11,12)]))
+            }
+          }
+        }
+      }else{
+        if(test$W[j] == 1){
+          if(test$M[j] == 1){
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(3,5,6,8,10,12)]) / (prod(f[2, c(3,5,6,8,10,12)]) + prod(f[1, c(3,5,6,8,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(3,5,6,8,11,12)]) / (prod(f[2, c(3,5,6,8,11,12)]) + prod(f[1, c(3,5,6,8,11,12)]))
+            }
+          }else{
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(3,5,6,9,10,12)]) / (prod(f[2, c(3,5,6,9,10,12)]) + prod(f[1, c(3,5,6,9,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(3,5,6,9,11,12)]) / (prod(f[2, c(3,5,6,9,11,12)]) + prod(f[1, c(3,5,6,9,11,12)]))
+            }
+          }
+        }else{
+          if(test$M[j] == 1){
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(3,5,7,8,10,12)]) / (prod(f[2, c(3,5,7,8,10,12)]) + prod(f[1, c(3,5,7,8,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(3,5,7,8,11,12)]) / (prod(f[2, c(3,5,7,8,11,12)]) + prod(f[1, c(3,5,7,8,11,12)]))
+            }
+          }else{
+            if(test$I[j] == 1){
+              prob[j] = prod(f[2, c(3,5,7,9,10,12)]) / (prod(f[2, c(3,5,7,9,10,12)]) + prod(f[1, c(3,5,7,9,10,12)]))
+            }else{
+              prob[j] = prod(f[2, c(3,5,7,9,11,12)]) / (prod(f[2, c(3,5,7,9,11,12)]) + prod(f[1, c(3,5,7,9,11,12)]))
+            }
+          }
+        }
+      }
+    }
+  }
+  return(prob)
+}
+
+#split data into 10-folds
+library(caret)
+set.seed(999)
+index <- createFolds(dummy$C50, 10, list = T, returnTrain = F)
+accuracy <- numeric(10)
+
+#cross vli
+for(i in 1:10){
+  train <- dummy[-index[[i]],]
+  test <- dummy[index[[i]],]
+  prob <- MyNaiveBayes(train, test)
+  outcome <- ifelse(prob > 0.5, 1, 0)
+  accuracy[i] <- mean(test$C50 == outcome)
+}
+accuracy
+mean(accuracy)
+```
+
+So the final acuracy is 0.7419928
+
+## Problem 2
+
+```{r}
+library(xlsx)
+uffi <- read.xlsx(file="/Users/xingyang/Desktop/5030/uffidata.xlsx",sheetName = "Sales Data", header = T)
+uffi <- uffi[-100,]
+str(uffi)
+```
+
+### 1
+
+```{r}
+summary(uffi)
+```
+
+From the summary, Sale.Price, Bsmnt.Fin_SF, Lot.Area
+and Living.Area_SF maybe have outliers since these variables' mean and max are vere different. And I defined outlier that are more than 3 standard deviations from the mean.
+
+```{r}
+out <- select(uffi, Sale.Price, Bsmnt.Fin_SF, Lot.Area, Living.Area_SF)
+
+#detect outlier 
+n <- ncol(out)
+colmean <- colMeans(out)
+colsd <- apply(out, 2, function(x) sd(x))
+
+for(i in 1:n)
+{
+  outlier <- out[which(abs((out[,i] - colmean[i]) / colsd[i]) >3),i]
+  if(length(outlier) != 0){
+    print(paste(colnames(out)[i],
+                which(abs((out[,i] - colmean[i]) / colsd[i]) >3),
+                outlier))
+  }
+}
+```
+
+As we can see, there are five outliers in Sale.Price and Living.Area_SF.
+
+### 2
+
+```{r}
+hist(uffi$Sale.Price, breaks = c(seq(0,350000,10000)), col = "grey", freq = F)
+mean <- mean(uffi$Sale.Price)
+sd <- sd(uffi$Sale.Price)
+curve(dnorm(x, mean = mean, sd = sd), col = "red", add = T)
+lines(density(uffi$Sale.Price), col = "black", lty = 2)
+
+library(psych)
+pairs.panels(uffi)
+```
+
+As we can see, the Sale.Price is normally distributed and a little skew right, thus amenable to parametric statistical analysis. There collinearities between Sale.Price and Living.Area_SF with the 0.72 correlation coefficient.
+
+### 3
+
+From my part, I think the presence or absence of UFFI is not enough to predict the value of a residential property. Although it would release hazardous formaldehyde gas as it decayed through time, there is still controversy concerning the health of UFFI insulated homes. And sometimes, we do not know whether that home used UFFI and have any precedent that the sale price would be lower without disclosure of UFFI presence.
+
+### 4
+
+```{r}
+uffi1 <- uffi[-1]
+lmfit <- lm(Sale.Price ~., uffi1)
+summary(lmfit)$coefficients
+```
+
+As we can see, the p-value of UFFI.IN is 0.28340 which is large than 0.05, so it is not a significant predictor variable.
+
+### 5
+
+```{r}
+library(rms)
+#use p-value tp backfit
+rmsfit <- ols(Sale.Price ~ Year.Sold + UFFI.IN + Brick.Ext + X45.Yrs. + Bsmnt.Fin_SF + Lot.Area + Enc.Pk.Spaces + Living.Area_SF + Central.Air + Pool, data = uffi)
+fastbw(rmsfit, rule = "p", sls = 0.05)
+pfit <- lm(Sale.Price ~ Year.Sold + Enc.Pk.Spaces + Living.Area_SF + Pool, uffi1)
+
+#use AIC to backfit
+aicfit <- step(lmfit, direction = "backward", trace = F)
+aicfit
+```
+
+As we can see, the formula of these two method are drifferent, I will use RMSE to evaluate these two formula.
+
+```{r}
+library(ModelMetrics)
+prmse <- rmse(predict(pfit, uffi1), uffi1$Sale.Price)
+aicrmse <- rmse(predict(aicfit, uffi1), uffi1$Sale.Price)
+prmse > aicrmse
+```
+
+Since the aicfit has smaller RMSE, so I will use the aicfit and the model is Sale.Price = -9.994e+06 + 4.992e+03 * Year.Sold + 8.532e+03 * Brick.Ext + 2.530e+00 * Lot.Area + 1.004e+04 * Enc.Pk.Spaces + 5.220e+01 * Living.Area_SF + 6.680e+04 * Pool
+
+```{r}
+summary(aicfit)
+aicrmse
+```
+For above, we can see each variable's p-value, and this model's R-squared is 0.7634, RMSE is 19522.8.
+
+### 6
+
+```{r}
+print(lmfit)
+```
+
+From this formula, on average, the presence UFFI would decrease the value of a property of 5.653e+03.
+
+### 7
+
+
+```{r}
+fit <- lm(Sale.Price ~ . - Year.Sold, uffi1)
+print(fit)
+a <- c(NA, NA, 0, 1, 1 ,0, 5000, 2, 1700, 1, 0)
+b <- c(NA, NA, 1, 1, 1, 0, 5000, 2, 1700, 1, 0)
+test <- data.frame(rbind(uffi1, a, b))
+predict(fit, test[100:101,], interval = "confidence", level = 0.95)
+```
+
+The predicted value of this home without UFFI is 193536.6 and the 95% confidence intervals is c(177652.4, 209420.9)
+The predicted value of this home without UFFI is 181706.2 and the 95% confidence intervals is c(163136.5 200276.0)
+
+### 8
+
+```{r}
+predict <- predict(fit, test[100:101,])
+predict[1] - 215000
+predict[2] - 215000
+predict[2] - predict[1]
+```
+
+Without UFFI the overpaid is 21463.35, with UFFI the overpaid is 33293.78. the compensation is 11830.43.
+
+## Problem 3
+
+```{r}
+titanic <- read.csv(file="/Users/xingyang/Desktop/5030/titanic_data.csv", header = T, na.strings = " ")
+titanic1 <- select(titanic, -PassengerId, -Name, -Ticket, -Cabin)
+titanic1$Survived <- factor(titanic$Survived)
+titanic1$Pclass <- factor(titanic$Pclass)
+colSums(is.na(titanic1))
+
+# impute missing value
+library(mice)
+imputedage <- mice(titanic1, m=1, maxit = 50, method = 'cart', printFlag = F, seed = 500)
+prbm3 <- complete(imputedage,1)
+hist(titanic$Age, seq(0,85,5))
+hist(prbm3$Age, seq(0,85,5))
+```
+
+From this two historgram, the distribution of the imputed Age has a similar distribution to the actual Age. 
+
+```{r}
+#change to dummy variable
+a <- model.matrix(~.,prbm3)
+full <- data.frame(a[,-1])
+full$Survived2 <- factor(full$Survived2)
+str(full)
+```
+
+### 1
+
+```{r}
+library(caret)
+set.seed(1)
+indxTrain <- createDataPartition(y = full$Survived2, p = 0.65,list = FALSE)
+train <- full[indxTrain,]
+test <- full[-indxTrain,]
+
+#justify 
+prop.table(table(full$Survived2))
+prop.table(table(test$Survived2))
+prop.table(table(train$Survived2))
+```
+
+### 2
+
+```{r}
+lgfull <- lrm(Survived2~Pclass2 + Pclass3 + Sex2 + Age + SibSp + Parch + Fare + Embarked2 + Embarked3 + Embarked4, train)
+#delete p-value less than 0.05
+fastbw(lgfull, rule = "p", sls = 0.05)
+
+lgpfit <- glm(Survived2 ~ Pclass2 + Pclass3 + Sex2 + Age + SibSp, train, family = 'binomial')
+summary(lgpfit)
+```
+
+### 3
+
+```{r}
+print(lgpfit)
+```
+
+Survived2 = 4.44996 + -1.30922 * Pclass2 - 2.70244 * Pclass3 - 2.61602 * Sex2 - 0.04914 * Age - 0.55744*SibSp
+
+(if Survived2 is large than 0.5, that one would be surivied)
+
+### 4
+
+```{r}
+predict <- ifelse(predict(lgpfit, test) > 0.5, 1, 0)
+mean(predict == test$Survived2)
+```
+
+So the accuracy is 0.7942122.
+
+## Problem 4
+
+KNN can estimate both qualitative attributes and quantitative varibale. It is not necessary to build a predictive model for each attribute with missing data, even does not build visible models. Efficiency is the biggest trouble for this method. While the k-nearest neighbor algorithms look for the most similar instances, the whole dataset should be searched. However, the dataset is usually very huge for searching. On the other hand, how to select the value “k” and the measure of similar will impact the result greatly. Using Naive Bayesian decide the order of the attribute to be treated according to some measurements such as information gain, missing rate, weighted index, etc.Using the Naive Bayesian Classifier to estimate missing data. It is an iterative and repeating process. The algorithms replace missing data in the first attribute defined in phase one, and then turn to the next attribute on the base of those attributes which have be filled in. 
+
+Since KNN can be used to do classification can also be used to do the regression, it can be used for numerical data and discrete data. So, knn can impute numerical or categorical missing value. But, Naive Bayesian can be only used for clissfication, it can not impute the continuous missing value. If the dataset have many factors and each variables are independence, then Naive Bayesian would be better. Because we cannot to calcuate the distance of categorical value. Also, if most variables are numeric, we should use KNN. What is more, since the KNN is not suitbale to deal with unbalanced dataset and not sensitive to outlier. So, if the dataset is small,high bias and low variance, we can use Naive Bayes to impute missing value, if not, KNN is better to handle with the dataset of low bias and high variance
+

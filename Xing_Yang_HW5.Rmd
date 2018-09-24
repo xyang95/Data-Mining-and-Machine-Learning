@@ -1,0 +1,185 @@
+---
+title: "Xing_Yang_HW5"
+author: "Xing Yang"
+date: "2017/10/19"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###Problem 1
+
+```{r}
+library(C50)
+#exploring and preparing the data
+credit <- read.csv("/Users/xingyang/Desktop/5030/credit.csv")
+str(credit)
+table(credit$checking_balance)
+table(credit$savings_balance)
+summary(credit$months_loan_duration)
+summary(credit$amount)
+table(credit$default)
+
+#creating random training and test datasets
+set.seed(123)
+train_sample <- sample(1000, 900)
+str(train_sample)
+credit_train <- credit[train_sample, ]
+credit_test  <- credit[-train_sample, ]
+prop.table(table(credit_train$default))
+prop.table(table(credit_test$default))
+
+#training a model on the data
+credit_train$default <- as.factor(credit_train$default)
+credit_test$default <- as.factor(credit_test$default)
+credit_model <- C5.0(credit_train[-17], credit_train$default)
+credit_model
+summary(credit_model)
+
+#evaluating model performance
+credit_pred <- predict(credit_model, credit_test)
+library(gmodels)
+CrossTable(credit_test$default, credit_pred,
+             prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+             dnn = c('actual default', 'predicted default'))
+
+#improving model performance
+credit_boost10 <- C5.0(credit_train[-17], credit_train$default, trials = 10)
+credit_boost10
+summary(credit_boost10)
+credit_boost_pred10 <- predict(credit_boost10, credit_test)
+CrossTable(credit_test$default, credit_boost_pred10,
+             prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+             dnn = c('actual default', 'predicted default'))
+
+#Making mistakes more costlier than others
+matrix_dimensions <- list(c("no", "yes"), c("no", "yes"))
+names(matrix_dimensions) <- c("predicted", "actual")
+matrix_dimensions
+error_cost <- matrix(c(0, 1, 4, 0), nrow = 2)
+error_cost
+credit_cost <- C5.0(credit_train[-17], credit_train$default, costs = error_cost)
+credit_cost_pred <- predict(credit_cost, credit_test)
+CrossTable(credit_test$default, credit_cost_pred,
+             prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE,
+             dnn = c('actual default', 'predicted default'))
+```
+
+###Problem 2
+
+```{r}
+#exploring and preparing the data
+mushrooms <- read.csv("/Users/xingyang/Desktop/5030/mushrooms.csv", stringsAsFactors = TRUE)
+str(mushrooms)
+mushrooms$veil_type <- NULL
+table(mushrooms$type)
+
+#training a model on the data
+library(rJava)
+library(RWeka)
+mushroom_1R <- OneR(type ~ ., data = mushrooms)
+mushroom_1R
+
+#evaluating model performance
+summary(mushroom_1R)
+
+#improving model performance
+mushroom_JRip <- JRip(type ~ ., data = mushrooms)
+mushroom_JRip
+```
+
+###Problem 3
+
+Knn
+Advantages:
+1. Theory is mature, simple thinking, both can be used to do classification can also be used to do the regression.
+2. It can be used for numerical data and discrete data.
+3. We do not need the assumption of data, not sensitive to outlier.
+Disadvantages:
+1. For the large sample size of the data set, knn needs a relatively larger calculation.
+2. If the sample is not balanced, the prediction bias is relatively large.
+3. The method of calculating distance and the k value of choice would influence the algorithm
+Application areas
+The model need a particularly easily explanation. 
+Text classification, pattern recognition, cluster analysis, multi-classification field
+
+Naive Bayesian
+Advantages:
+1. Naive Bayesian model originated from the classical mathematical theory, has a solid mathematical foundation, and a stable classification efficiency.
+2. Naive Bayesian interpretation of the results easy to understand.
+3. The performance of small-scale data is very good, can handle a multi-classification tasks, suitable for incremental training.
+Disadvantages:
+1. Since we assume that each variables are independence, so if not, this would affect the outcome.
+2. We need to calculate the prior probability, and there is an error rate in the classification decision.
+Application areas
+Need a relatively easy explanation, the different dimensions of the correlation between the model is small.
+Text classification, fraud detection
+
+Decision trees
+Advantages:
+1. Decision trees are easy to understand and explain, can be visualized, easy to extract the rules.
+2. It can process simultaneously nominal and numerical data.
+3. The preparation of data is often simple or unnecessary.
+4. It can be a good extension to a large database, while its size is independent of the database size.
+Disadvantages:
+1. Dealing with missing data is difficult.
+2. It often has overfitting. 
+3. Ignoring the relevance of the attributes in the data set.
+
+Application areas
+Because it can generate a clearly based on the feature to choose different predictions of the tree structure, it can be used for Search sort and the decision-making process.
+
+RIPPER rule
+Advantage:
+1. It can enerate easy-to-understand and human-readable rules
+2. It can handle large data sets and noise data sets very well
+3. It usually produce simpler rules than decision trees
+Disadvantages:
+Processing of numerical data is not ideal, so the rules of the general requirements of the data set to the name of the main variable or all are nominal variable.
+Application areas
+Suitable for building a model of unbalanced data distribution.
+
+###Problem 4
+
+Ensemble methods are techniques that create multiple models and then combine them to produce improved results. Ensemble methods usually produces more accurate solutions than a single model would. We can ues model assemble to obtain better predictive performance than could be obtained from any of the constituent learning algorithms alone, so it is important. Also, when we use a single method, we cannot get a high accuracy, then we can use modle assemble. 
+
+Bagging 
+Building multiple models (typically of the same type) from different subsamples of the training dataset.
+One way to reduce the variance of an estimate is to average together multiple estimates. It is a method of sampling with replacement, the sampling strategy is a simple random sampling. Bagging's idea is to train the algorithm to train multiple rounds, each round of training set from the initial training set randomly selected n training samples, the initial training in a round of training set can occur many times or no training after the Get a predictive function sequence h1, h2 ??? hn, the final predictive function H to the classification problem using the voting method, the regression problem using a simple average method to identify the new example. 
+Steps :
+1. Generate n different bootstrap training sample.
+2. Train Algorithm on each bootstrapped sample separately.
+3. Average the predictions at the end.
+
+
+Boosting
+Building multiple models (typically of the same type) each of which learns to fix the prediction errors of a prior model in the chain.
+Boosting refers to a family of algorithms that are able to convert weak learners to strong learners. The main principle of boosting is to fit a sequence of weak learners??? models that are only slightly better than random guessing, such as small decision trees??? to weighted versions of the data.  At the time of initialization, we give equal weight 1 / n to each training case, and then use the algorithm to train. After each training, we give a larger weight to the training case of training failure. In the follow-up study, we focus on the more difficult training to learn, so as to get a predictive function sequence h1, h2 ??? hn where each hi has a certain weight, predict the effect of good predictive function weight is large, otherwise smaller. The final predictive function H uses a weighted voting method for the classification problem, and uses the weighted average method for the regression problem to discriminate the new example.
+
+Steps :
+1. Draw a random subset of training samples d1 without replacement from the training set D to train a weak learner C1
+2. Draw second random training subset d2 without replacement from the training set and add 50 percent of the samples that were previously falsely classified/misclassified to train a weak learner C2
+3. Find the training samples d3 in the training set D on which C1 and C2 disagree to train a third weak learner C3
+4.Combine all the weak learners via majority voting.
+
+Boosting and bagging are similar, in that they are both ensembling techniques, where a number of weak learners (classifiers/regressors that are barely better than guessing) combine (through averaging or max vote) to create a strong learner that can make accurate predictions. Bagging means that you take bootstrap samples (with replacement) of your data set and each sample trains a (potentially) weak learner. Boosting, on the other hand, uses all data to train each learner, but instances that were misclassified by the previous learners are given more weight so that subsequent learners give more focus to them during training.
+
+
+https://www.toptal.com/machine-learning/ensemble-methods-machine-learning
+
+https://blog.statsbot.co/ensemble-learning-d1dcd548e936
+
+https://en.wikipedia.org/wiki/Ensemble_learning
+
+
+
+
+
+
+
+
+

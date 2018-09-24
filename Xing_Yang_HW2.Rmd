@@ -1,0 +1,183 @@
+---
+title: "Homework2"
+author: "Xing Yang"
+date: "2017/9/20"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Question 1
+
+```{r}
+data = USArrests
+a = 1.5*sd(data$Assault)
+b = mean(data$Assault)
+data$Assault[which((abs(data$Assault-b)/a) >= 1)]
+row.names(data[which((abs(data$Assault-b)/a) >= 1), ])
+```
+
+As we can see,  four states are outliers that are Florida, Maryland, North Carolina, North Dakota.
+
+#Question 2
+
+```{r}
+library(tidyverse)
+ggplot(data = data, mapping = aes(x = Murder, y = Assault)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F) 
+cor.test(data$Murder, data$Assault)
+```
+
+From the plot, the murder and assault have the positive relationship, and in the correlation test, the p-value is less than 0.05, which means there are some relationship. And the correlation is 0.8018733 which is close to 1, so the correlation relationship is strong. 
+
+#Question 3
+
+```{r}
+data = read.csv("/Users/xingyang/Desktop/5030/hw2.csv",sep = ",")
+data
+n <- nrow(data)
+library(forecast)
+library(TTR)
+#samplie moving average
+F2017 <- ((data[n,2] + data[n-1, 2] + data[n-2, 2])/3)
+F2017
+SMA(data[, 2], n = 3)[11]
+```
+
+The phone use for 2017 using a simple moving average using last 3 years is 175848268.
+
+```{r}
+#weighted moving average
+w <- c(4, 1, 1)
+last3 <- data[n:(n-2), 2]
+sw <- w*last3
+F20171 <- sum(sw)/sum(w)
+F20171
+#check the answer
+WMA(data[,2], n = 3, wts = c(1, 1, 4))[11]
+```
+
+The phone use for 2017 using a 3-year weighted moving average is 189396150.
+
+```{r}
+#exponential smoothing
+data$Ft <- 0
+data$E <- 0
+a <- 0.2
+data$Ft[1] <- data[1,2]
+for(i in 2:n){
+  data$Ft[i] <- data$Ft[i-1] + a*data$E[i-1]
+  data$E[i] <- data[i,2] - data$Ft[i]
+}
+df_es <-data
+F20172 <- data$Ft[n] + a*data$E[n]
+F20172
+#check the answer
+EMA(data[,2], wilder = T, n = 1, ratio = 0.2)[11]
+```
+
+The phone use for 2017 using exponential smoothing is 123744469.
+
+```{r}
+#linear regression trendline
+library(ggplot2)
+fit <- lm(data$Subscribers~data$X...Year)
+print(fit)
+F20173 = -3.666e+10 + (1.828e+07)*2016
+F20173
+```
+
+The phone use for 2017 using linear regression trendline is 192480000.
+
+#Question 4
+
+```{r}
+#samplie moving average
+data$Ft <- 0
+data$E <- 0
+library(TTR)
+data$Ft[2:n] <- SMA(data[, 2], n = 3)[1:n-1]
+data$E[4:n] <- abs(data[4:n,2]-data$Ft[4:n])
+df_sma <- data
+tail(df_sma)
+mean(df_sma$E[which(df_sma$E != 0)])
+```
+
+The average absolute error for simple moving average using last 3 years is 38419568.
+
+```{r}
+#weighted moving average
+data$Ft <- 0
+data$E <- 0
+data$Ft[2:n] <- WMA(data[,2], n = 3, wts = c(1, 1, 4))[1:n-1]
+data$E[4:n] = abs(data[4:n,2] - data[4:n,3])
+df_wam <- data
+tail(df_wam)
+mean(df_wam$E[which(df_wam$E != 0)])
+```
+
+The average absolute error for 3-year weighted moving average is 29713726.
+
+```{r}
+#exponential smoothing
+data$Ft <- 0
+data$E <- 0
+data$Ft[1] <- data[1,2]
+data$Ft[2:n] <- EMA(data[,2], wilder = T, n = 1, ratio = 0.2)[1:n-1]
+data$E = abs(data[,2] - data[,3])
+df_ema <- data
+tail(df_ema)
+mean(df_ema$E[which(df_ema$E != 0)])
+```
+
+The average absolute error for exponential smoothing is 50278149.
+
+```{r}
+#linear regression trendline
+data$Ft <- 0
+data$E <- 0
+print(fit) 
+for(i in 1:n){
+  data$Ft[i] <- -3.666e+10 + (1.828e+07)*data[i,1]
+  data$E[i] <- abs(data[i, 2] - data$Ft[i])
+}
+df_lr <- data
+tail(df_lr)
+mean(df_lr$E)
+```
+
+The average absolute error for linear regression trendline is 11631719.
+
+#Question 5
+
+```{r}
+mean(df_sma$E[which(df_sma$E != 0)])
+mean(df_wam$E[which(df_wam$E != 0)])
+mean(df_ema$E[which(df_ema$E != 0)])
+mean(df_lr$E)
+```
+
+So the smallest mean absolute error is the linear regression model
+
+#Question 6
+
+```{r}
+mean(F20171, F20172, F20173)
+```
+
+The average forecast by averaging out the three forecasts calculated in (3) is 189396150
+
+
+
+
+
+
+
+
+
+
+
+

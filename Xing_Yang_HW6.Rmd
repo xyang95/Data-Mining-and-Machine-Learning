@@ -1,0 +1,193 @@
+---
+title: "Fall 2017 DA5030 Homewokr6"
+author: "Xing Yang"
+date: "2017/10/26"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###Problem 1
+
+```{r}
+#hydroGOF
+library(dplyr)
+library(psych)
+library(plyr)
+math <- read.csv("/Users/xingyang/Desktop/5030/student/student-mat.csv",sep = ";")
+str(math)
+```
+
+####1
+
+```{r}
+colnames(math[,sapply(math, is.integer)])
+
+cor(math[c("age", "failures", "G1", "G2", "G3")])
+pairs.panels(math[c("age", "failures", "G1", "G2", "G3")])
+```
+
+####2
+
+For the nominal variables, I think sex, schoolsup, famsup, paid and higher would influence student's grade. For the numeric variables, I think age, studytime, failures ,freetime, goout, Dalc, health absences, G1, G2 would influence student's
+
+```{r}
+#convert to dummy 
+into_factor = function(x){
+     if(class(x) == "factor"){
+         n = length(x)
+         data.fac = data.frame(x=x, y=1:n)
+         output = model.matrix(y~x, data.fac)[,-1]
+     }
+     else{
+        output = x
+     }
+     output
+}
+
+mymath <- data.frame(cbind(
+  into_factor(math$sex),
+  into_factor(math$schoolsup),
+  into_factor(math$famsup),
+  into_factor(math$paid),
+  into_factor(math$higher),
+  math[c("age", "studytime", "failures", "freetime", "goout", "Dalc", "health", "absences", "G1", "G2", "G3")]
+))
+
+fit <- lm(G3~., mymath)
+summary(fit)
+```
+
+####3
+
+```{r}
+#I use the step() function, so the backward elimination measure I applied is AIC. 
+fitaic <- step(fit, direction = "backward")
+summary(fitaic)
+```
+
+So my final model is: G3 = 1.14642772 + -0.15952921*age - 0.16764205*studytime - 0.22031456*failures + 0.04076377*absences + 0.16536830*G1 + 0.96234112*G2
+
+####4
+
+```{r}
+predict(fitaic,newdata=mymath[1:10,],interval='prediction')
+```
+
+####5
+
+```{r}
+pred <- predict(fitaic, newdata = mymath)
+rmse = function(x, y){
+  sqrt(mean((x - y)^2))
+}
+rmse <- rmse(pred, mymath$G3)
+rmse
+
+#check
+library(ModelMetrics)
+ModelMetrics::rmse(pred, mymath$G3)
+```
+
+###Problem 2
+
+####1
+
+```{r}
+math$pf <- ifelse(math$G3 >= 10, "P", "F")
+#dummy variable
+math$response <- ifelse(math$pf == "P", 1, 0)
+```
+
+####2
+
+```{r}
+library(dummies)
+math1 <- select(math, -pf, -G3)
+factorcol <- colnames(math[,sapply(math, is.factor)])
+newmath <- dummy.data.frame(math1, names = factorcol)
+```
+
+```{r}
+mymath1 <- data.frame(cbind(
+  into_factor(math$sex),
+  into_factor(math$reason),
+  into_factor(math$higher),
+  math[c("age", "studytime", "failures", "freetime", "goout", "Dalc", "health", "absences", "G1", "G2", "response")]
+))
+lgfit <- glm(response ~ ., data = mymath1, family='binomial')
+summary(lgfit)
+
+#AIC
+lgfitaic <- step(lgfit, direction = "backward")
+summary(lgfitaic)
+```
+
+####3
+
+```{r}
+print(lgfitaic)
+```
+
+response = -11.65829 + 1.39615*xother - 0.41033*age - 0.73673*studytime - 0.03685*absences + 0.36005*G1 + 1.85162*G2
+
+####4
+
+```{r}
+lgoutcome <- predict(lgfitaic, mymath1)
+lgpredict <- ifelse(lgoutcome > 0.5, 1, 0)
+lgaccuracy = mean(lgpredict == mymath1$response)
+lgaccuracy
+```
+
+###Problem 3
+
+####1
+
+```{r}
+#205 to 217
+
+#exploring and preparing the data
+wine <- read.csv("/Users/xingyang/Desktop/5030/whitewines.csv")
+str(wine)
+hist(wine$quality)
+wine_train <- wine[1:3750, ]
+wine_test <- wine[3751:4898, ]
+
+#training a model on the data
+library(rpart)
+m.rpart <- rpart(quality ~ ., data = wine_train)
+m.rpart
+library(rpart.plot)
+rpart.plot(m.rpart, digits = 3)
+rpart.plot(m.rpart, digits = 4, fallen.leaves = TRUE, type = 3, extra = 101)
+
+#evaluating model performance
+p.rpart <- predict(m.rpart, wine_test)
+summary(p.rpart)
+summary(wine_test$quality)
+cor(p.rpart, wine_test$quality)
+MAE <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+MAE(p.rpart, wine_test$quality)
+
+#improving model performance
+library(RWeka)
+m.m5p <- M5P(quality ~ ., data = wine_train)
+m.m5p
+summary(m.m5p)
+p.m5p <- predict(m.m5p, wine_test)
+cor(p.m5p, wine_test$quality)
+MAE(wine_test$quality, p.m5p)
+```
+
+####2
+
+```{r}
+rmse(p.rpart, wine_test$quality)
+rmse(p.m5p, wine_test$quality)
+```
+

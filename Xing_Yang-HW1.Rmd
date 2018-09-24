@@ -1,0 +1,78 @@
+---
+title: "Homework 1"
+author: "Xing Yang"
+date: "2017/9/14"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+#Question1
+data = read.csv("/Users/xingyang/Desktop/5030/customertxndata.csv",sep = ",")
+
+#Question2
+nrow(data)
+mean(data$Visits)
+median(data$Revenue)
+min(data$Transactions, na.rm = T)
+max(data$Transactions, na.rm = T)
+summary(data$OS)
+```
+
+The most commonly used operating system is Android.
+
+```{r}
+#Question3
+ggplot(data = data, mapping = aes(x = Visits, y = Revenue)) + 
+  geom_point() + 
+  geom_smooth(se = F)
+plot(Revenue~Visits, data = data)
+```
+
+From the plot, the correlation between the two variables is that the more visits means the higher revenue.
+
+```{r}
+#Question 4
+summary(data)
+```
+As we can see, Transactions and Gender have missing data, I will use the mean of Transactions instead of the miss values and will delete the miss values of Gender.
+
+```{r}
+#Question 5
+tran = mean(data$Transactions, na.rm = T)
+data$Transactions[is.na(data$Transactions)] = tran
+data1 = na.omit(data)
+summary(data1)
+#Question 6
+data_training = data1[seq(1, nrow(data1), 2), ]
+data_validation = data1[seq(2, nrow(data1), 2), ]
+#Question 7
+mean(data_training$Revenue)
+mean(data_validation$Revenue)
+```
+
+The means are 450.1965 and 452.1243 which are almost equality, which means that the data of missing value is randomly distributed.
+And the means of the orignak data is 454.9, so the method of imputing missing value used in Qustion 5 is good.
+
+```{r}
+#Question 8
+library(caret)
+traindata1 = createDataPartition(data1$Visits, p = .5,
+                                 list = F,
+                                 times = 1)
+traindata = data1[traindata1, ]
+summary(traindata)
+testdata = data1[-traindata1,]
+summary(testdata)
+```
+
+
+
+
+
+
+

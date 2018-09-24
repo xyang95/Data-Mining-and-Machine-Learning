@@ -1,0 +1,174 @@
+---
+title: "Fall 2017 DA5030 Practicum 3"
+author: "Xing Yang"
+date: "2017/11/12"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Problem 1
+
+###Question 1&2
+
+```{r}
+prbm1 <-  read.table(file="/Users/xingyang/Desktop/5030/bank-full.csv", sep = ";", header = T)
+str(prbm1)
+colSums(is.na(prbm1))
+```
+
+###Question 3
+
+```{r}
+bank <- as.data.frame(model.matrix(~.,prbm1))[-1]
+bank$yyes <- as.factor(bank$yyes)
+levels(bank$yyes) <- make.names(levels(bank$yyes))
+library(caret)
+set.seed(1)
+indxTrain <- createDataPartition(y = bank$yyes, p = 0.65,list = FALSE)
+train <- bank[indxTrain,]
+test <- bank[-indxTrain,]
+
+#justify 
+prop.table(table(bank$yyes))
+prop.table(table(test$yyes))
+prop.table(table(train$yyes))
+
+set.seed(1492)
+ctrl <- trainControl(method = "cv", 
+                     n = 3,	
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+svm.grid <- expand.grid(sigma = c(0.01, 0.05),
+                        C = c(0.75, 1, 1.25))
+svm <- train(yyes ~ .,
+             train,
+             method = "svmRadial",
+             preProc = c("center","scale"),  
+             metric = "ROC",
+             trControl = ctrl,
+             tuneGrid = svm.grid)
+svm
+
+svm_pred <- predict(svm, test)
+```
+
+###Question 4
+
+```{r}
+#normalize the train and test data
+normalize <- function(x) {
+  return((x - min(x)) / (max(x) - min(x)))
+}
+bank$age = normalize(bank$age)
+bank$balance = normalize(bank$balance)
+bank$day = normalize(bank$day)
+bank$duration = normalize(bank$duration)
+bank$campaign = normalize(bank$campaign)
+bank$pdays = normalize(bank$pdays)
+bank$previous = normalize(bank$previous)
+
+nnet_train <- bank[indxTrain,]
+nnet_test <- bank[-indxTrain,]
+
+set.seed(142)
+ctrl <- trainControl(method = "cv", 
+                     n = 5,	
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+nnet.grid <- expand.grid(decay = c(0.5, 0.1), 
+                         size = c(5, 6, 7))
+nnet <- train(yyes ~ .,
+              nnet_train,
+              method = "nnet", 
+              maxit = 1000, 
+              tuneGrid = nnet.grid,
+              trControl = ctrl,
+              preProc = c("center","scale"),  
+              metric = "ROC")  
+nnet
+
+nnet_pred <- predict(nnet, nnet_test)
+```
+
+###Question 5
+
+```{r}
+#svm accuracy
+mean(svm_pred == test$yyes)
+#nnet accuracy
+mean(nnet_pred == test$yyes)
+
+svm_prob <- predict(svm, test, type = "prob")
+nnet_prob <- predict(nnet, nnet_test, type = "prob")
+library(ROCR)
+svm_input <- prediction(svm_prob[,2], test$yyes)
+svm_auc <- performance(svm_input,"auc")
+#svm auc
+svm_auc@y.values
+
+nnet_input <- prediction(nnet_prob[,2], test$yyes)
+nnet_auc <- performance(nnet_input, "auc")
+#nnet auc
+nnet_auc@y.values
+```
+
+##Problem 2
+
+###Questio 1-3
+
+```{r}
+library(arules)
+plants <- read.transactions("https://archive.ics.uci.edu/ml/machine-learning-databases/plants/plants.data", format = "basket", sep = ",", cols = 1)
+plantsrules = apriori(plants, parameter = list(support =
+0.05, confidence = 0.8, minlen = 2))
+plantsrules
+#set of 3434008 rules which is too much 
+inspect(sort(plantsrules, by = "lift")[1:5])
+
+rules = apriori(plants, parameter = list(supp = 0.1, conf = 0.9))
+rules
+inspect(sort(rules, by = "lift")[1:5])
+#going on
+rules = apriori(plants, parameter = list(supp = 0.1, conf = 0.95))
+summary(rules)
+#95 rules that is fine
+inspect(sort(rules, by = "lift")[1:5])
+
+library(arulesViz)
+plot(rules, method="paracoord", control=list(reorder=TRUE))
+```
+
+###Question 4
+
+```{r}
+#convert to dummary varibale
+library(klaR)
+dummyplants <- as.data.frame(as(plants, "matrix"))
+dummyplants[,1:70] <- lapply(dummyplants[,1:70], as.integer)
+
+#this line ran so much time and svm also need couple hours which means I need knit more than 8 hours, so I decided use a part of whole data.
+#kmodes(kplants, 3, iter.max = 5, weighted = FALSE)
+
+set.seed(1)
+indxTrain <- createDataPartition(y = dummyplants$ab, p = 0.05,list = FALSE)
+train <- dummyplants[indxTrain,]
+kcluster <- kmodes(train[, 1:10], 3, iter.max = 5, weighted = FALSE)
+summary(kcluster)
+```
+
+###Question 5
+
+```{r}
+#rules
+plot(rules)
+plot(rules, method="graph", control=list(type="items"))
+
+#kmode
+plot(train[, 1:10], col = kcluster$cluster)
+```
+
